@@ -766,12 +766,62 @@ function viewMail(){
   '<p class="es" style="padding:0">指定した期間の依頼メールと返信を、古いものから順にまとめて取り込みます。メールが多いと時間がかかるので、取り込みが終わるまでこのページを開いたままにしてください(取り込み済みのメールは飛ばすので、中断しても続きから再開できます)。</p>'+
   '<div><button class="btn" type="button" data-act="getattall">登録済みの案件に、メールの添付をまとめて取り込む</button></div>'+
   '<p class="es" style="padding:0">ページを閉じている間は確認しません。メールの添付ファイル(ZIPは展開して)は、取り込んだ案件の「添付ファイル」に自動で保存します。メールが大きくても取り込みを試み、ZIPは中のファイルごとに保存します。1ファイルが20MBを超えるものは、画像は縮小、動画は低画質のWebMに変換、その他はZIP圧縮してから保存します(動画は再生時間と同じだけ時間がかかります)。それでも収まらないものは案件のメモに残します。(パスワード付きのZIP・PDFは、そのまま保存します。)</p></div>'+
+  '<div class="card panel"><div class="ph"><h2>取り込みの確認</h2><span class="h">実際に動いているかを調べます</span></div><div id="mailsum">'+mailSum()+'</div><div><button class="btn pri" type="button" data-act="gmdiag">接続と取り込みを確認する</button></div><div id="gmdiag"></div></div>'+
   '<div class="card panel"><div class="ph"><h2>取り込みの記録</h2><span class="h">新しい順・最新60通</span></div><div id="maillog">'+mailLog()+'</div></div>';
+}
+/* ---- 取り込みの確認(診断) ---- */
+function mailSum(){
+ var L=Object.keys(state.mails).map(function(k){return state.mails[k];}),c={registered:0,linked:0,skip:0,error:0,processing:0};
+ L.forEach(function(m){if(c[m.state]!=null)c[m.state]++;});
+ var last=L.reduce(function(a,m){return m.at&&m.at>a?m.at:a;},""),gc=state.cases.filter(function(x){return x.source==="gmail";}).length,d=last?new Date(last):null;
+ return '<div style="display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;align-items:center"><span>取り込み済みのメール <b class="num">'+L.length+'</b>通</span><span class="tag o">案件を登録 '+c.registered+'</span><span class="tag o">返信を紐づけ '+c.linked+'</span><span class="tag">対象外 '+c.skip+'</span>'+(c.error?'<span class="tag w">失敗 '+c.error+'</span>':'')+(c.processing?'<span class="tag a">処理中 '+c.processing+'</span>':'')+'<span>メール由来の案件 <b class="num">'+gc+'</b>件</span><span style="color:var(--ink3)">最後の取り込み '+(d?fd(jstDate(last))+" "+pad(d.getHours())+":"+pad(d.getMinutes()):"まだありません")+'</span></div>';
+}
+function drawDiag(){
+ var e=$("#gmdiag");if(!e)return;var g=state.gm,D=g.diag||[];
+ e.innerHTML=D.length?D.map(function(x){return '<div style="display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px"><span style="flex:none;width:1.5em;text-align:center;font-weight:900;color:'+(x.s==="ok"?"var(--ok)":x.s==="ng"?"var(--danger)":x.s==="run"?"var(--amber)":"var(--ink3)")+'">'+(x.s==="ok"?"✓":x.s==="ng"?"✗":x.s==="run"?"…":"−")+'</span><div style="min-width:0"><b>'+esc(x.t)+'</b><div style="color:var(--ink2);overflow-wrap:anywhere">'+esc(x.d||"")+'</div></div></div>';}).join(""):'<div class="es">「接続と取り込みを確認する」を押すと、Gmailへの接続・メールの読み取り・AI・保存を順に調べます(案件は登録しません)。</div>';
+}
+async function gmRawNames(mid){
+ var r=await gmCall("get_message",{messageId:mid,messageFormat:"RAW"}),x=longestStr(r);if(!x)throw new Error("本文が空です");
+ var bin=(/^[A-Za-z0-9_\-+\/=\s]+$/.test(x.slice(0,300))&&!/^(MIME-Version|Received|Return-Path|Delivered-To|From|Date|Content-Type|Subject|To|X-)[A-Za-z-]*:/i.test(x))?bin2str(b64bytes(x)):x;
+ var list=[];mimeWalk(bin,list,0);return list;
+}
+async function gmDiag(){
+ var g=state.gm;if(g.diagBusy)return;g.diagBusy=true;var D=g.diag=[];
+ var step=function(t){var o={t:t,s:"run",d:"確認中…"};D.push(o);drawDiag();return o;};
+ var done=function(o,s2,d){o.s=s2;o.d=d;drawDiag();};
+ var o;
+ try{
+  o=step("共有データベースへの保存");
+  if(state.mode!=="db"||!state.db)done(o,"ng","共有データベースにつながっていません(claude.ai で開いたときだけ使えます)。");
+  else{try{await state.db.doc("meta/diag").set({at:new Date().toISOString()});await state.db.doc("meta/diag").delete();done(o,"ok","書き込みと削除ができました。");}catch(e){done(o,"ng",gmErr(e));}}
+  o=step("添付ファイルの保存先");done(o,state.assets?"ok":"ng",state.assets?"保存できます(1ファイル20MBまで。超えると圧縮します)。":"使えません(編集権限が必要です)。");
+  o=step("AIによる読み取り");
+  if(!state.sample)done(o,"ng","使えません。簡易解析で登録されます(精度が下がります)。");
+  else{try{var j=await state.sample.json('次のJSONだけを出力してください: {"ok":true}',{modelTier:"default"});done(o,j&&j.ok?"ok":"ng",j&&j.ok?"応答しました。":"応答が想定と違います: "+JSON.stringify(j).slice(0,80));}catch(e){done(o,"ng",gmErr(e));}}
+  o=step("Gmailへの接続と検索");
+  if(!state.mcp){done(o,"ng","Gmailに接続できません。claude.ai の設定 → コネクタ で Gmail を接続してください。");return;}
+  var q=g.q||GMQ0,p;
+  try{p=await gmCall("search_threads",{query:q,pageSize:50});g.consent=true;}catch(e){done(o,"ng",(authErr(e)?"許可が必要です。「今すぐ確認して登録」を押して、Gmailの利用を許可してください。":"")+gmErr(e));return;}
+  var ths=p.threads||[],ms=[];ths.forEach(function(t){(t.messages||[]).forEach(function(m){ms.push({m:m,t:t});});});
+  done(o,ths.length?"ok":"ng",ths.length?"検索条件に合うスレッド "+ths.length+"件(メール "+ms.length+"通)が見つかりました。最新: 「"+one(ths[0].messages&&ths[0].messages[0]&&ths[0].messages[0].subject,40)+"」":"検索条件に合うメールがありません。ラベル名と期間を確認してください。\n検索条件: "+q);
+  var fresh=ms.filter(function(x){return !state.mails[x.m.id];}),rp=fresh.filter(function(x){return isReply(x.m.subject);});
+  o=step("未取り込みのメール");done(o,"ok",ms.length+"通のうち、取り込み済み "+(ms.length-fresh.length)+"通・未取り込み "+fresh.length+"通(うち返信 "+rp.length+"通)。"+(fresh.length?"「今すぐ確認して登録」で取り込めます。":""));
+  var pick=(fresh.length?fresh:ms).filter(function(x){return !isReply(x.m.subject);})[0]||ms[0];
+  if(!pick){return;}
+  o=step("メール本文の読み取り");var mm;
+  try{mm=await gmCall("get_message",{messageId:pick.m.id,messageFormat:"PLAIN_TEXT"});var bl=String(mm.plaintextBody||mm.plaintext_body||"").length;done(o,bl>20?"ok":"ng","「"+one(mm.subject,40)+"」の本文を "+bl+"文字読み取りました。"+((mm.attachments||[]).length?"添付 "+mm.attachments.length+"件: "+(mm.attachments||[]).map(function(a){return a.filename||a.name;}).join("、"):"添付なし。"));}
+  catch(e){done(o,"ng",gmErr(e));return;}
+  var withAtt=ms.filter(function(x){return (x.m.sizeEstimate||0)>0&&(x.m.sizeEstimate||0)<4e6;});
+  o=step("添付の取得");
+  if(!(mm.attachments||[]).length)done(o,"-","試したメールに添付がありません。");
+  else if((pick.m.sizeEstimate||0)>8e6)done(o,"-","メールが大きいため(約"+Math.round((pick.m.sizeEstimate||0)/1e6)+"MB)、診断では試しません。");
+  else{try{var al=await gmRawNames(pick.m.id);done(o,al.length?"ok":"ng",al.length?al.length+"件の添付を読み取れました: "+al.slice(0,5).map(function(a){return a.name+"("+Math.round(a.bytes.length/1024)+"KB)";}).join("、"):"添付を読み取れませんでした。");}catch(e){done(o,"ng",gmErr(e));}}
+ }finally{g.diagBusy=false;drawDiag();}
 }
 function drawMail(){
  var d=$("#gmside");if(d)d.innerHTML=state.mcp&&state.mode==="db"?'<span class="dot '+(state.gm.err?"warn":state.gm.consent?"ok":"")+'"></span>Gmail連携 '+(state.gm.auto&&state.gm.consent?"自動":"手動"):"";
  if(state.view!=="mail")return;
- var a=$("#mailstat"),b=$("#maillog");if(a)a.innerHTML=mailStat();if(b)b.innerHTML=mailLog();
+ var a=$("#mailstat"),b=$("#maillog"),sm=$("#mailsum");if(a)a.innerHTML=mailStat();if(b)b.innerHTML=mailLog();if(sm)sm.innerHTML=mailSum();
 }
 
 /* ---- 案件フォーム ---- */
@@ -903,7 +953,8 @@ document.addEventListener("click",function(e){
  if(t.dataset.setst){collect();editing.status=t.dataset.setst;var sc=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc;return;}
  if(t.dataset.rmfile!==undefined){collect();editing.files.splice(+t.dataset.rmfile,1);var sc2=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc2;return;}
  var a=t.dataset.act;
- if(a==="gmdeep"){var gg=state.gm;if(!gg.from&&!gg.to&&gg.rp!=="all"){toast("期間を選ぶか、日付を入れてください");return;}gmRun(true,{from:gg.from||"",to:gg.to||""});}
+ if(a==="gmdiag")gmDiag();
+ else if(a==="gmdeep"){var gg=state.gm;if(!gg.from&&!gg.to&&gg.rp!=="all"){toast("期間を選ぶか、日付を入れてください");return;}gmRun(true,{from:gg.from||"",to:gg.to||""});}
  else if(a==="gmstop"){state.gm.stop=true;}
  else if(a==="ack")patchCase(t.dataset.cid,function(o){o.unread=0;});
  else if(a==="getatt")gmAttachTo(t.dataset.cid,t);

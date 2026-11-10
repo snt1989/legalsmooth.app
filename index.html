@@ -164,6 +164,7 @@ tbody tr{cursor:pointer}tbody tr:hover td{background:var(--surface2)}td.r,th.r{t
  <div id="main">
   <header class="top">
    <div><h1 id="pt">ホーム</h1><div class="sub" id="ps"></div></div><div class="grow"></div>
+   <button class="btn" id="b-share" type="button" hidden>共有</button>
    <button class="btn" id="b-imp" type="button">フォルダから取り込み</button>
    <button class="btn" id="b-csv" type="button" hidden>CSV出力</button>
    <button class="btn pri" id="b-new" type="button">＋ 新規案件</button>
@@ -226,6 +227,7 @@ function localSave(){try{localStorage.setItem(LK,JSON.stringify(state.cases.filt
 function startLocal(){state.mode="local";state.cases=localLoad();setSync("warn","この端末のみに保存");render();}
 function boot(){
  if(!window.claude||!window.claude.use){startLocal();return;}
+ $("#b-share").hidden=false;
  var done=false,to=setTimeout(function(){if(!done){done=true;startLocal();}},9000);
  Promise.all([claude.use("db"),claude.use("user")]).then(function(r){
   if(done)return;done=true;clearTimeout(to);
@@ -237,6 +239,7 @@ function boot(){
   claude.use("sample").then(function(sm){state.sample=sm;}).catch(function(){});
   db.collection("mails").onSnapshot(function(sn){var o={};sn.docs.forEach(function(d){o[d.id]=Object.assign({},d.data(),{id:d.id});});state.mails=o;drawMail();},function(){});
   db.doc("meta/mail").onSnapshot(function(sn){var d=sn.exists?sn.data():null;state.gm.meta=d;if(d&&d.query&&!state.gm.qEdited){d.query=d.query.replace(/\s*-subject:RE\b/i,"");state.gm.q=d.query;var i=$("#gmq");if(i&&document.activeElement!==i)i.value=d.query;}},function(){});
+  if(user&&user.me)user.me().then(function(p){state.me=(p&&p.name)||"";}).catch(function(){});
   if(user&&user.can)user.can("data.write").then(function(v){if(v===false){state.canWrite=false;render();}}).catch(function(){});
   db.collection("cases").onSnapshot(function(snap){
    var real=snap.docs.map(function(d){var o=Object.assign({},d.data());o.id=d.id;return o;});
@@ -248,7 +251,7 @@ function boot(){
 }
 function errMsg(){return "保存できませんでした。通信状態を確認して、もう一度保存してください。";}
 function saveCase(c){
- c.updatedAt=new Date().toISOString();
+ c.updatedAt=new Date().toISOString();if(state.me)c.updatedBy=state.me;
  var body=Object.assign({},c);delete body.id;delete body._demo;
  if(state.mode==="db")return state.db.collection("cases").doc(c.id).set(body);
  var i=state.cases.findIndex(function(x){return x.id===c.id;});if(i>=0)state.cases[i]=c;else state.cases.push(c);
@@ -389,7 +392,7 @@ function viewDetail(c){
  h+='<div class="card side"><h3>進み具合</h3><div class="vsteps">'+STATUS.map(function(s){return '<button type="button" class="'+(c.status===s[0]?"on":"")+'" style="--st:'+s[1]+'" data-sst="'+esc(s[0])+'" data-cid="'+id+'"'+(can?"":" disabled")+'><i></i>'+esc(s[0])+'</button>';}).join("")+'</div></div>';
  var ms=missing(c);
  h+='<div class="card side"><h3>足りない書類</h3>'+(ms.length?'<div style="font-size:12.5px;line-height:1.8">'+ms.map(function(x){return '・'+esc(x[1]);}).join("<br>")+'</div>':'<div class="es" style="padding:0">必要な書類は揃っています。</div>')+'</div>';
- h+='<div class="card side" style="font-size:12px;line-height:1.9;color:var(--ink2)"><h3 style="color:var(--ink)">登録の記録</h3>登録:'+(c.source==="gmail"?"メールから自動登録":c.folderName?"フォルダから取り込み":"手入力")+'<br>最終更新:'+fdt(c.updatedAt)+(c.folderName?'<br>フォルダ:'+esc(c.folderName):'')+'</div>';
+ h+='<div class="card side" style="font-size:12px;line-height:1.9;color:var(--ink2)"><h3 style="color:var(--ink)">登録の記録</h3>登録:'+(c.source==="gmail"?"メールから自動登録":c.folderName?"フォルダから取り込み":"手入力")+'<br>最終更新:'+fdt(c.updatedAt)+(c.updatedBy?' / '+esc(c.updatedBy):'')+(c.folderName?'<br>フォルダ:'+esc(c.folderName):'')+'</div>';
  h+='</div></div>';
  return h;
 }
@@ -880,6 +883,23 @@ function upload(list){
   .catch(function(){toast(f.name+" をアップロードできませんでした(20MBまで)");next();});
  })();
 }
+var SHARE_URL="https://claude.ai/artifact/BnsM1oX2vDrAm7qbFqJSBb";
+function openShare(){
+ var g=state.gm;
+ $("#mbox").innerHTML='<div class="mh"><h3>チームで共有する</h3><button class="ib" data-close type="button" aria-label="閉じる">✕</button></div><div class="mb" style="display:flex;flex-direction:column;gap:14px;padding-top:14px">'+
+ '<div class="note info">案件・書類チェック・メールの取り込み結果・添付ファイルは、このページを開いた全員で自動的に共有されます。共有の相手を追加する操作だけは、claude.ai の画面(共有メニュー)で行います。</div>'+
+ '<label class="fi" style="min-width:0">このページのリンク<span style="display:flex;gap:8px"><input type="text" id="shurl" readonly value="'+esc(SHARE_URL)+'"><button class="btn pri" type="button" data-act="copylink" style="flex:none">コピー</button></span></label>'+
+ '<div><div class="fs" style="padding-top:0">相手に使ってもらう手順</div><ol style="margin:0;padding-left:1.4em;line-height:1.9"><li>claude.ai でこのページを開き、共有メニューから相手(メールアドレス)を追加します。</li><li>権限は、登録・編集もする人は「編集できる」、見るだけの人は「閲覧」にします。</li><li>上のリンクを相手に送ります。相手は claude.ai にログインして開きます。</li></ol></div>'+
+ '<div><div class="fs" style="padding-top:0">いまのあなたの状態</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag '+(state.canWrite?"o":"a")+'">'+(state.canWrite?"編集できる":"閲覧のみ")+'</span><span class="tag '+(state.mode==="db"?"o":"w")+'">'+(state.mode==="db"?"チームで共有中":"この端末のみ")+'</span><span class="tag '+(state.mcp&&g.consent?"o":"a")+'">Gmail '+(state.mcp?(g.consent?"接続済み":"未許可"):"未接続")+'</span>'+(state.me?'<span class="tag">'+esc(state.me)+'</span>':'')+'</div></div>'+
+ '<p class="es" style="padding:0">メールの自動取り込みは、取り込みを担当する人がGmailを接続してこのページを開いている間だけ動きます。取り込んだ結果は、全員に共有されます。</p></div><div class="mf"><span class="grow"></span><button class="btn" data-close type="button">閉じる</button></div>';
+ $("#modal").hidden=false;
+}
+function copyLink(btn){
+ var i=$("#shurl"),ok=function(){btn.textContent="コピーしました";setTimeout(function(){btn.textContent="コピー";},1800);};
+ i.select();
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(SHARE_URL).then(ok).catch(function(){try{if(document.execCommand("copy"))ok();else toast("リンクを選択しました。Ctrl+C でコピーしてください");}catch(e){toast("リンクを選択しました。Ctrl+C でコピーしてください");}});}
+ else{try{if(document.execCommand("copy"))ok();else toast("リンクを選択しました。Ctrl+C でコピーしてください");}catch(e){toast("リンクを選択しました。Ctrl+C でコピーしてください");}}
+}
 function closeModal(){$("#modal").hidden=true;editing=null;render();}
 function doSave(){
  collect();var c=editing;
@@ -953,7 +973,8 @@ document.addEventListener("click",function(e){
  if(t.dataset.setst){collect();editing.status=t.dataset.setst;var sc=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc;return;}
  if(t.dataset.rmfile!==undefined){collect();editing.files.splice(+t.dataset.rmfile,1);var sc2=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc2;return;}
  var a=t.dataset.act;
- if(a==="gmdiag")gmDiag();
+ if(a==="copylink")copyLink(t);
+ else if(a==="gmdiag")gmDiag();
  else if(a==="gmdeep"){var gg=state.gm;if(!gg.from&&!gg.to&&gg.rp!=="all"){toast("期間を選ぶか、日付を入れてください");return;}gmRun(true,{from:gg.from||"",to:gg.to||""});}
  else if(a==="gmstop"){state.gm.stop=true;}
  else if(a==="ack")patchCase(t.dataset.cid,function(o){o.unread=0;});
@@ -987,6 +1008,7 @@ document.addEventListener("input",function(e){if(e.target.id==="fq"){state.f.q=e
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#modal").hidden)closeModal();});
 $("#b-new").addEventListener("click",function(){openForm();});
 $("#b-imp").addEventListener("click",openImport);
+$("#b-share").addEventListener("click",openShare);
 $("#b-csv").addEventListener("click",csv);
 /* ---- ログイン(claude.ai の外=デプロイ版でだけ表示。claude.aiで開いたときはclaude.aiのログインが使われる) ---- */
 var LOGIN_HASH="03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",AK="ls_auth";

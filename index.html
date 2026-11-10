@@ -153,8 +153,7 @@ tbody tr{cursor:pointer}tbody tr:hover td{background:var(--surface2)}td.r,th.r{t
  .kv{grid-template-columns:104px minmax(0,1fr);padding:11px 14px}.dh h1{font-size:18px}
 }
 </style>
-</head>
-<body>
+
 <div id="app">
  <aside id="side">
   <div class="brand"><span class="logo"><img src="data:image/png;base64,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" alt="リーガルスムーズ"></span><b>案件管理</b><small>株式会社三桜</small></div>
@@ -225,8 +224,37 @@ var LK="ls_cases_local";
 function localLoad(){try{return JSON.parse(localStorage.getItem(LK)||"[]")||[];}catch(e){return [];}}
 function localSave(){try{localStorage.setItem(LK,JSON.stringify(state.cases.filter(function(c){return !c._demo;})));}catch(e){}}
 function startLocal(){state.mode="local";state.cases=localLoad();setSync("warn","この端末のみに保存");render();}
+/* ---- 共有サーバー(Vercel版): /api/db にデータを置き、5秒ごとに最新を取り込む ---- */
+function furl(u){u=String(u||"");if(state.mode==="shared"&&u.indexOf("/api/file")===0){try{return u+"&k="+(localStorage.getItem(AK)||sessionStorage.getItem(AK)||"");}catch(e){}}return u;}
+function apiH(){var k="";try{k=localStorage.getItem(AK)||sessionStorage.getItem(AK)||"";}catch(e){}return {"x-auth":k};}
+function apiGet(c){return fetch("/api/db"+(c?"?c="+encodeURIComponent(c):""),{headers:apiH(),cache:"no-store"}).then(function(r){if(r.status===401){var e=new Error("auth");e.auth=true;throw e;}if(!r.ok)throw new Error("http "+r.status);return r.json();});}
+function apiPost(b){return fetch("/api/db",{method:"POST",headers:Object.assign({"content-type":"application/json"},apiH()),body:JSON.stringify(b)}).then(function(r){if(r.status===401){var e=new Error("auth");e.auth=true;throw e;}if(!r.ok)throw new Error("http "+r.status);return r.json();});}
+var shPend=0,shSig="",shTimer=null;
+function shPull(){
+ if(shPend>0||document.hidden)return;
+ apiGet("cases").then(function(j){
+  if(shPend>0)return;
+  var d=j.docs||{},rows=Object.keys(d).map(function(id){var o=Object.assign({},d[id]);o.id=id;return o;});
+  var sig=JSON.stringify(rows);
+  if(sig!==shSig){shSig=sig;state.cases=rows.length?rows:(state.demo?demoRows():[]);if(rows.length)state.demo=false;if(!editing)render();else renderNavOnly();}
+  setSync("ok","チームで共有中・"+rows.length+"件");
+ }).catch(function(e){if(e&&e.auth){try{localStorage.removeItem(AK);sessionStorage.removeItem(AK);}catch(x){}location.reload();return;}setSync("warn","接続できません。自動で再接続します");});
+}
+function shUpload(f){
+ if(f.size>4.4*1024*1024)return Promise.reject(new Error("big"));
+ return fetch("/api/upload?n="+encodeURIComponent(f.name||"file"),{method:"POST",headers:Object.assign({"content-type":f.type||"application/octet-stream"},apiH()),body:f}).then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.json();});
+}
+function startShared(){
+ return apiGet("").then(function(){
+  state.mode="shared";state.canWrite=true;state.assets={upload:shUpload};
+  setSync("warn","共有データを読み込み中…");shPull();
+  clearInterval(shTimer);shTimer=setInterval(shPull,5000);
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)shPull();});
+  return true;
+ });
+}
 function boot(){
- if(!window.claude||!window.claude.use){startLocal();return;}
+ if(!window.claude||!window.claude.use){startShared().catch(function(e){if(e&&e.auth){try{localStorage.removeItem(AK);sessionStorage.removeItem(AK);}catch(x){}location.reload();return;}startLocal();});return;}
  $("#b-share").hidden=false;
  var done=false,to=setTimeout(function(){if(!done){done=true;startLocal();}},9000);
  Promise.all([claude.use("db"),claude.use("user")]).then(function(r){
@@ -254,11 +282,15 @@ function saveCase(c){
  c.updatedAt=new Date().toISOString();if(state.me)c.updatedBy=state.me;
  var body=Object.assign({},c);delete body.id;delete body._demo;
  if(state.mode==="db")return state.db.collection("cases").doc(c.id).set(body);
+ if(state.mode==="shared"){var j=state.cases.findIndex(function(x){return x.id===c.id;});if(j>=0)state.cases[j]=c;else state.cases.push(c);render();shPend++;
+  return apiPost({c:"cases",id:c.id,data:body}).then(function(){shPend--;shSig="";shPull();},function(e){shPend--;shSig="";shPull();throw e;});}
  var i=state.cases.findIndex(function(x){return x.id===c.id;});if(i>=0)state.cases[i]=c;else state.cases.push(c);
  localSave();render();return Promise.resolve();
 }
 function delCase(id){
  if(state.mode==="db")return state.db.collection("cases").doc(id).delete();
+ if(state.mode==="shared"){state.cases=state.cases.filter(function(x){return x.id!==id;});render();shPend++;
+  return apiPost({c:"cases",id:id,del:true}).then(function(){shPend--;shSig="";shPull();},function(e){shPend--;shSig="";shPull();throw e;});}
  state.cases=state.cases.filter(function(x){return x.id!==id;});localSave();render();return Promise.resolve();
 }
 
@@ -383,7 +415,7 @@ function viewDetail(c){
  var nd=needDocs(c);
  r='<div style="padding:12px 16px" class="dl">'+nd.map(function(x){var y=have(c,x[0]);return '<div class="di'+(y?" got":"")+'"><label><input type="checkbox" data-ddoc="'+x[0]+'" data-cid="'+id+'"'+(y?" checked":"")+(can?"":" disabled")+'><span>'+esc(x[1])+' <small>'+esc(x[2])+'</small></span></label></div>';}).join("")+'</div>';
  h+=sec('案件フォルダの書類 <span class="meter'+(p.h<p.n?" low":"")+'" style="margin-left:8px"><i><b style="width:'+(p.n?p.h/p.n*100:0)+'%"></b></i>'+p.h+'/'+p.n+'</span>',r);
- r='<div style="padding:12px 16px" class="dl">'+((c.files&&c.files.length)?c.files.map(function(f,i){return '<div class="fl"><a href="'+esc(f.url)+'" target="_blank" rel="noopener">'+esc(f.name)+'</a><button class="btn sm" type="button" data-dl="'+i+'" data-cid="'+id+'">ダウンロード</button></div>';}).join(""):'<div class="es">添付はまだありません。</div>')+'</div>';
+ r='<div style="padding:12px 16px" class="dl">'+((c.files&&c.files.length)?c.files.map(function(f,i){return '<div class="fl"><a href="'+esc(furl(f.url))+'" target="_blank" rel="noopener">'+esc(f.name)+'</a><button class="btn sm" type="button" data-dl="'+i+'" data-cid="'+id+'">ダウンロード</button></div>';}).join(""):'<div class="es">添付はまだありません。</div>')+'</div>';
  h+=sec("添付ファイル",r,(c.mailId&&can&&state.assets&&state.mcp?'<button class="btn sm" type="button" data-act="getatt" data-cid="'+id+'">メールの添付を取り込む</button> ':'')+eb);
  r=kv("見積額(税抜)",c.quote!==""&&c.quote!=null?yen(c.quote):"")+kv("請求額(税抜)",c.amount!==""&&c.amount!=null?yen(c.amount):"")+kv("請求日",c.invoiceDate?fd(c.invoiceDate):"");
  h+=sec("金額",r,eb);
@@ -398,9 +430,9 @@ function viewDetail(c){
 }
 function dlFile(id,i,btn){
  var c=state.cases.find(function(x){return x.id===id;}),f=c&&c.files&&c.files[i];if(!f)return;
- if(!state.downloads){window.open(f.url,"_blank");return;}
+ if(!state.downloads){window.open(furl(f.url),"_blank");return;}
  var tx=btn.textContent;btn.disabled=true;btn.textContent="準備中…";
- fetch(f.url,{credentials:"include"}).then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.blob();})
+ fetch(furl(f.url),{credentials:"include"}).then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.blob();})
  .then(function(b){return state.downloads.save({filename:f.name,data:b});})
  .then(function(){toast("保存しました");}).catch(function(e){if(!e||e.code!=="declined")toast("ダウンロードできませんでした。ファイル名のリンクから開いてください");})
  .then(function(){btn.disabled=false;btn.textContent=tx;});
@@ -858,7 +890,7 @@ function drawForm(){
  h+='<div class="mf">'+(e?"":'<button class="btn dng" data-act="del" type="button">削除</button>')+'<span class="grow"></span><button class="btn" data-close type="button">閉じる</button><button class="btn pri" data-act="save" type="button">保存</button></div>';
  $("#mbox").innerHTML=h;wireDrop();
 }
-function filesHtml(c){return (c.files&&c.files.length)?c.files.map(function(f,i){return '<div class="fl"><a href="'+esc(f.url)+'" target="_blank" rel="noopener">'+esc(f.name)+'</a><button class="btn sm dng" type="button" data-rmfile="'+i+'">外す</button></div>';}).join(""):'<div class="es">添付はまだありません。</div>';}
+function filesHtml(c){return (c.files&&c.files.length)?c.files.map(function(f,i){return '<div class="fl"><a href="'+esc(furl(f.url))+'" target="_blank" rel="noopener">'+esc(f.name)+'</a><button class="btn sm dng" type="button" data-rmfile="'+i+'">外す</button></div>';}).join(""):'<div class="es">添付はまだありません。</div>';}
 function collect(){
  var c=editing;["propertyName","room","contractor","tenant","propKind","purpose","assignee","manager","managerPerson","police","keyMethod","address","managerPhone","services","equipment","residentYears","deathPlace","receivedDate","surveyDate","surveyTime","dueDate","utilElec","utilGas","utilWater","mailbox","nameplate","findings","neighbor","invoiceDate","memo"].forEach(function(k){var el=$("#f_"+k);if(el)c[k]=el.value.trim();});
  ["quote","amount"].forEach(function(k){var v=$("#f_"+k).value;c[k]=v===""?"":Number(v);});
@@ -890,7 +922,7 @@ function openShare(){
  '<div class="note info">案件・書類チェック・メールの取り込み結果・添付ファイルは、このページを開いた全員で自動的に共有されます。共有の相手を追加する操作だけは、claude.ai の画面(共有メニュー)で行います。</div>'+
  '<label class="fi" style="min-width:0">このページのリンク<span style="display:flex;gap:8px"><input type="text" id="shurl" readonly value="'+esc(SHARE_URL)+'"><button class="btn pri" type="button" data-act="copylink" style="flex:none">コピー</button></span></label>'+
  '<div><div class="fs" style="padding-top:0">相手に使ってもらう手順</div><ol style="margin:0;padding-left:1.4em;line-height:1.9"><li>claude.ai でこのページを開き、共有メニューから相手(メールアドレス)を追加します。</li><li>権限は、登録・編集もする人は「編集できる」、見るだけの人は「閲覧」にします。</li><li>上のリンクを相手に送ります。相手は claude.ai にログインして開きます。</li></ol></div>'+
- '<div><div class="fs" style="padding-top:0">いまのあなたの状態</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag '+(state.canWrite?"o":"a")+'">'+(state.canWrite?"編集できる":"閲覧のみ")+'</span><span class="tag '+(state.mode==="db"?"o":"w")+'">'+(state.mode==="db"?"チームで共有中":"この端末のみ")+'</span><span class="tag '+(state.mcp&&g.consent?"o":"a")+'">Gmail '+(state.mcp?(g.consent?"接続済み":"未許可"):"未接続")+'</span>'+(state.me?'<span class="tag">'+esc(state.me)+'</span>':'')+'</div></div>'+
+ '<div><div class="fs" style="padding-top:0">いまのあなたの状態</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag '+(state.canWrite?"o":"a")+'">'+(state.canWrite?"編集できる":"閲覧のみ")+'</span><span class="tag '+(state.mode==="db"||state.mode==="shared"?"o":"w")+'">'+(state.mode==="db"||state.mode==="shared"?"チームで共有中":"この端末のみ")+'</span><span class="tag '+(state.mcp&&g.consent?"o":"a")+'">Gmail '+(state.mcp?(g.consent?"接続済み":"未許可"):"未接続")+'</span>'+(state.me?'<span class="tag">'+esc(state.me)+'</span>':'')+'</div></div>'+
  '<p class="es" style="padding:0">メールの自動取り込みは、取り込みを担当する人がGmailを接続してこのページを開いている間だけ動きます。取り込んだ結果は、全員に共有されます。</p></div><div class="mf"><span class="grow"></span><button class="btn" data-close type="button">閉じる</button></div>';
  $("#modal").hidden=false;
 }
@@ -1031,5 +1063,3 @@ document.addEventListener("click",function(e){var t=e.target.closest("#logout");
 if(!window.claude&&!authed()){showLogin();}else{startApp();}
 })();
 </script>
-</body>
-</html>

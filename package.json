@@ -1,0 +1,9 @@
+{
+  "name": "legalsmooth-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "リーガルスムーズ案件管理(株式会社三桜)",
+  "dependencies": {
+    "@vercel/blob": "2.9.0"
+  }
+}

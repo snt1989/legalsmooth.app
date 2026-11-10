@@ -685,29 +685,40 @@ async function gmReply(m){
   throw x;
  }
 }
-async function gmRun(manual){
+async function gmRun(manual,deep){
  var g=state.gm;if(g.busy||!state.mcp||state.mode!=="db"||!state.canWrite)return;
- g.busy=true;g.err="";drawMail();
- var reg=0,fail=0,lnk=0,list=[];
+ g.busy=true;g.err="";g.stop=false;g.deep=!!deep;g.prog=deep?"メールを探しています…":"";drawMail();
+ var reg=0,fail=0,lnk=0,list=[],q=g.q||GMQ0,tok="",pages=0,seen={};
+ if(deep){q=q.replace(/\s*newer_than:\S+/ig,"");if(deep.days)q+=" newer_than:"+deep.days+"d";}
  try{
-  var p=await gmCall("search_threads",{query:g.q||GMQ0,pageSize:30});
-  (p.threads||[]).forEach(function(t){(t.messages||[]).forEach(function(m){
-   if(!m||!m.id)return;
-   var L=state.mails[m.id];if(L&&(L.state!=="processing"||Date.now()-Date.parse(L.at)<6e5))return;
-   list.push({id:m.id,subject:m.subject||"",sender:m.sender||"",date:m.date||"",url:m.viewUrl||"",threadId:m.threadId||t.id||"",reply:isReply(m.subject)||(t.messages.length>1&&m.id!==t.id)});});});
+  do{
+   var sp={query:q,pageSize:deep?50:30};if(tok)sp.pageToken=tok;
+   var p=await gmCall("search_threads",sp);
+   var ths=p.threads||[];
+   for(var ti=0;ti<ths.length;ti++){var t=ths[ti],ms=t.messages||[];
+    if((t.messageCount||0)>ms.length){try{var tt=await gmCall("get_thread",{threadId:t.id,messageFormat:"MINIMAL"});if(tt.messages&&tt.messages.length>=ms.length)ms=tt.messages;}catch(e3){if(authErr(e3))throw e3;}}
+    ms.forEach(function(m){
+     if(!m||!m.id||seen[m.id])return;seen[m.id]=1;
+     var L=state.mails[m.id];if(L&&(L.state!=="processing"||Date.now()-Date.parse(L.at)<6e5))return;
+     list.push({id:m.id,subject:m.subject||"",sender:m.sender||"",date:m.date||"",url:m.viewUrl||"",threadId:m.threadId||t.id||"",reply:isReply(m.subject)||(ms.length>1&&m.id!==t.id)});});}
+   tok=deep?(p.nextPageToken||""):"";pages++;
+   if(deep){g.prog="メールを探しています… "+list.length+"通";drawMail();}
+  }while(tok&&pages<60&&!g.stop);
   list.sort(function(a,b){if(a.reply!==b.reply)return a.reply?1:-1;return String(a.date)<String(b.date)?-1:1;});
   g.consent=true;
-  for(var i=0;i<list.length&&i<(manual?40:15);i++){
+  for(var i=0;i<list.length&&i<(deep?1e6:manual?40:15)&&!g.stop;i++){
+   if(deep){g.prog="取り込み中 "+(i+1)+" / "+list.length+"通(登録 "+reg+"・紐づけ "+lnk+")";drawMail();}
    try{var lg=list[i].reply?await gmReply(list[i]):await gmIngest(list[i]);if(lg.state==="registered")reg+=lg.caseIds.length;else if(lg.state==="linked")lnk+=lg.caseIds.length;}
    catch(x){if(authErr(x))throw x;fail++;}
   }
   g.ok=true;
  }catch(x){g.ok=false;g.err=gmErr(x);}
- g.at=Date.now();g.scanned=list.length;g.sent=reg;g.linked=lnk;g.fail=fail;g.busy=false;
+ g.at=Date.now();g.scanned=list.length;g.sent=reg;g.linked=lnk;g.fail=fail;g.busy=false;g.prog="";
  if(reg||lnk||manual){state.db.doc("meta/mail").set({query:g.q||GMQ0,lastRunAt:new Date().toISOString(),lastAdded:reg}).catch(function(){});}
  drawMail();
  if(reg||lnk)toast((reg?"メールから "+reg+" 件を登録しました。":"")+(lnk?"返信メール "+lnk+" 件を案件に紐づけました。":""));
  else if(manual&&g.ok)toast(list.length?"新しい案件の依頼はありませんでした":"新着メールはありません");
+ if(deep&&g.ok)toast((g.stop?"中断しました。":"過去のメールの取り込みが終わりました。")+"確認 "+list.length+"通・登録 "+reg+"件・返信の紐づけ "+lnk+"件"+(fail?"・失敗 "+fail+"通":""));
 }
 async function gmRedo(mid,force){
  var g=state.gm;if(g.busy||!state.mcp)return;var L=state.mails[mid];if(!L)return;
@@ -729,8 +740,8 @@ function mailStat(){
  if(!state.mcp)return '<div class="note">Gmailに接続できません。claude.ai でこのページを開き、設定 → コネクタ で Gmail を接続してください。</div>';
  if(!state.canWrite)return '<div class="note info">閲覧のみの権限では取り込みできません。</div>';
  var d=g.at?new Date(g.at):null;
- var st=g.busy?"確認中…(AIの読み取りは1通あたり数十秒かかることがあります)":g.err?'<span class="late">'+esc(g.err)+'</span>':d?"最後の確認 "+pad(d.getHours())+":"+pad(d.getMinutes())+"・新しいメール "+g.scanned+"通・登録 "+g.sent+"件・返信の紐づけ "+(g.linked||0)+"件"+(g.fail?"・失敗 "+g.fail+"通":""):"まだ確認していません";
- return '<div class="frow" style="align-items:center"><button class="btn pri" data-act="gmrun" type="button"'+(g.busy?" disabled":"")+'>今すぐ確認して登録</button><span style="font-size:12px;color:var(--ink2)">'+st+'</span></div>'+
+ var st=g.busy?(g.prog||"確認中…")+(g.deep?"":"(AIの読み取りは1通あたり数十秒かかることがあります)"):g.err?'<span class="late">'+esc(g.err)+'</span>':d?"最後の確認 "+pad(d.getHours())+":"+pad(d.getMinutes())+"・新しいメール "+g.scanned+"通・登録 "+g.sent+"件・返信の紐づけ "+(g.linked||0)+"件"+(g.fail?"・失敗 "+g.fail+"通":""):"まだ確認していません";
+ return '<div class="frow" style="align-items:center"><button class="btn pri" data-act="gmrun" type="button"'+(g.busy?" disabled":"")+'>今すぐ確認して登録</button>'+(g.busy&&g.deep?'<button class="btn dng" data-act="gmstop" type="button">中断</button>':'')+'<span style="font-size:12px;color:var(--ink2)">'+st+'</span></div>'+
   (state.sample?'':'<div class="note" style="margin-top:8px">AIによる読み取りが使えないため、簡易解析で登録します。内容を必ず確認してください。</div>');
 }
 function mailLog(){
@@ -746,9 +757,11 @@ function viewMail(){
  var g=state.gm;
  return '<div class="card panel"><div class="ph"><h2>メールから案件を自動登録</h2></div>'+
   '<p style="margin:0;line-height:1.8;color:var(--ink2)">Gmailの「100_業者別/リーガルスムーズ」ラベルが付いたメールから、依頼メール(「孤独死…」「無断退去…」など)を読み取り、物件・管理会社・鍵・サービス内容などを案件に登録します。登録した案件には「要確認」が付くので、開いて内容を確かめて保存してください。請求書の案内や「RE:」などの返信は、同じやり取りの案件に自動で紐づけて、案件詳細の「メールのやり取り」に要約を残します(作業日や期限が書かれていれば日程も更新、添付も保存します)。</p>'+
-  '<label class="fi g" style="min-width:0">Gmailの検索条件<input type="text" id="gmq" value="'+esc(g.q||GMQ0)+'"></label>'+
+  '<label class="fi" style="min-width:0;flex:none">Gmailの検索条件<input type="text" id="gmq" value="'+esc(g.q||GMQ0)+'"></label>'+
   '<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="gmauto"'+(g.auto?" checked":"")+'> このページを開いている間、5分ごとに自動で確認する</label>'+
   '<div id="mailstat">'+mailStat()+'</div>'+
+  '<div class="frow" style="align-items:center"><span style="font-size:12.5px;font-weight:700">過去のメール</span><select class="inp" id="gmrange" style="width:auto">'+[["180","半年前まで"],["365","1年前まで"],["730","2年前まで"],["0","すべて"]].map(function(o){return '<option value="'+o[0]+'"'+((g.range||"365")===o[0]?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select><button class="btn" type="button" data-act="gmdeep"'+(g.busy?" disabled":"")+'>さかのぼって取り込む</button>'+'</div>'+
+  '<p class="es" style="padding:0">指定した期間の依頼メールと返信を、古いものから順にまとめて取り込みます。メールが多いと時間がかかるので、取り込みが終わるまでこのページを開いたままにしてください(取り込み済みのメールは飛ばすので、中断しても続きから再開できます)。</p>'+
   '<div><button class="btn" type="button" data-act="getattall">登録済みの案件に、メールの添付をまとめて取り込む</button></div>'+
   '<p class="es" style="padding:0">ページを閉じている間は確認しません。メールの添付ファイル(ZIPは展開して)は、取り込んだ案件の「添付ファイル」に自動で保存します。メールが大きくても取り込みを試み、ZIPは中のファイルごとに保存します。1ファイルが20MBを超えるものは、画像は縮小、動画は低画質のWebMに変換、その他はZIP圧縮してから保存します(動画は再生時間と同じだけ時間がかかります)。それでも収まらないものは案件のメモに残します。(パスワード付きのZIP・PDFは、そのまま保存します。)</p></div>'+
   '<div class="card panel"><div class="ph"><h2>取り込みの記録</h2><span class="h">新しい順・最新60通</span></div><div id="maillog">'+mailLog()+'</div></div>';
@@ -887,7 +900,9 @@ document.addEventListener("click",function(e){
  if(t.dataset.setst){collect();editing.status=t.dataset.setst;var sc=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc;return;}
  if(t.dataset.rmfile!==undefined){collect();editing.files.splice(+t.dataset.rmfile,1);var sc2=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc2;return;}
  var a=t.dataset.act;
- if(a==="ack")patchCase(t.dataset.cid,function(o){o.unread=0;});
+ if(a==="gmdeep")gmRun(true,{days:+(state.gm.range||"365")});
+ else if(a==="gmstop"){state.gm.stop=true;}
+ else if(a==="ack")patchCase(t.dataset.cid,function(o){o.unread=0;});
  else if(a==="getatt")gmAttachTo(t.dataset.cid,t);
  else if(a==="getattall")gmAttachAll(t);
  else if(a==="back"){e.preventDefault();state.detail=null;render();window.scrollTo(0,0);}
@@ -906,6 +921,7 @@ document.addEventListener("click",function(e){
 document.addEventListener("change",function(e){
  var t=e.target;
  if(t.id==="gmq"){var q=t.value.trim()||GMQ0;state.gm.q=q;state.gm.qEdited=true;if(state.db)state.db.doc("meta/mail").set({query:q,lastRunAt:(state.gm.meta&&state.gm.meta.lastRunAt)||"",lastAdded:(state.gm.meta&&state.gm.meta.lastAdded)||0}).then(function(){toast("検索条件を保存しました");}).catch(function(){toast("保存できませんでした");});return;}
+ if(t.id==="gmrange"){state.gm.range=t.value;return;}
  if(t.id==="gmauto"){state.gm.auto=t.checked;try{localStorage.setItem("ls_gmauto",t.checked?"1":"0");}catch(e){}drawMail();return;}
  if(t.dataset&&t.dataset.doc){collect();editing.docs=editing.docs||{};editing.docs[t.dataset.doc]=t.checked;t.closest(".di").classList.toggle("got",t.checked);return;}
  if(t.id==="f_purpose"&&editing){collect();var sc=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc;return;}

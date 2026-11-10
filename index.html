@@ -249,6 +249,8 @@ function startShared(){
   state.mode="shared";state.canWrite=true;state.assets={upload:shUpload};
   setSync("warn","共有データを読み込み中…");shPull();
   clearInterval(shTimer);shTimer=setInterval(shPull,5000);
+  var gsync=function(){if(document.hidden)return;fetch("/api/gmail-sync",{headers:apiH(),cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok&&(j.registered||j.linked))shPull();}).catch(function(){});};
+  setTimeout(gsync,4000);setInterval(gsync,180000);
   document.addEventListener("visibilitychange",function(){if(!document.hidden)shPull();});
   return true;
  });

@@ -1,0 +1,4 @@
+{
+  "functions": { "api/gmail-sync.js": { "maxDuration": 60 } },
+  "crons": [ { "path": "/api/gmail-sync", "schedule": "0 22 * * *" } ]
+}

@@ -15,7 +15,7 @@ exports.root = function () {
 };
 
 exports.clean = (c) => (/^[a-z0-9_-]{1,40}$/i.test(String(c || '')) ? String(c) : '');
-const pathOf = (c) => L.root() + '/' + c + '.json';
+const pathOf = (c) => exports.root() + '/' + c + '.json';
 
 async function readColl(c) {
   const r = await get(pathOf(c), { access: 'private', useCache: false });

@@ -930,7 +930,7 @@ $("#b-new").addEventListener("click",function(){openForm();});
 $("#b-imp").addEventListener("click",openImport);
 $("#b-csv").addEventListener("click",csv);
 /* ---- ログイン(claude.ai の外=デプロイ版でだけ表示。claude.aiで開いたときはclaude.aiのログインが使われる) ---- */
-var LOGIN_HASH="03037f94c94138b8755f36d291af5b20672537b4bc6370e5c61e9cbb2ece6c8c",AK="ls_auth";
+var LOGIN_HASH="03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",AK="ls_auth";
 function sha(t){return crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)).then(function(b){return Array.prototype.map.call(new Uint8Array(b),function(x){return ("0"+x.toString(16)).slice(-2);}).join("");});}
 function authed(){try{return localStorage.getItem(AK)===LOGIN_HASH||sessionStorage.getItem(AK)===LOGIN_HASH;}catch(e){return false;}}
 function startApp(){$("#login").hidden=true;if(!window.claude){$("#lo").innerHTML='<a href="#" id="logout" style="color:inherit">ログアウト</a>';}render();boot();}

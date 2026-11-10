@@ -685,11 +685,13 @@ async function gmReply(m){
   throw x;
  }
 }
+function rdesc(){var g=state.gm;if(!g.from&&!g.to)return g.rp==="all"?"期間: すべて(ラベルの全メール)":"期間を選ぶか、日付を入れてください(空欄の側は制限なし)。";return "期間: "+(g.from?fd(g.from):"最初")+" 〜 "+(g.to?fd(g.to):"現在");}
+function setRange(k){var g=state.gm,t=today(),mm={"1m":30,"3m":91,"6m":182,"1y":365,"2y":730};g.rp=k;g.to="";g.from=k==="all"?"":addDays(t,-mm[k]);}
 async function gmRun(manual,deep){
  var g=state.gm;if(g.busy||!state.mcp||state.mode!=="db"||!state.canWrite)return;
  g.busy=true;g.err="";g.stop=false;g.deep=!!deep;g.prog=deep?"メールを探しています…":"";drawMail();
  var reg=0,fail=0,lnk=0,list=[],q=g.q||GMQ0,tok="",pages=0,seen={};
- if(deep){q=q.replace(/\s*newer_than:\S+/ig,"");if(deep.days)q+=" newer_than:"+deep.days+"d";}
+ if(deep){q=q.replace(/\s*(newer_than|older_than|after|before|newer|older):\S+/ig,"");if(deep.from)q+=" after:"+deep.from.replace(/-/g,"/");if(deep.to)q+=" before:"+addDays(deep.to,1).replace(/-/g,"/");}
  try{
   do{
    var sp={query:q,pageSize:deep?50:30};if(tok)sp.pageToken=tok;
@@ -760,7 +762,7 @@ function viewMail(){
   '<label class="fi" style="min-width:0;flex:none">Gmailの検索条件<input type="text" id="gmq" value="'+esc(g.q||GMQ0)+'"></label>'+
   '<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="gmauto"'+(g.auto?" checked":"")+'> このページを開いている間、5分ごとに自動で確認する</label>'+
   '<div id="mailstat">'+mailStat()+'</div>'+
-  '<div class="frow" style="align-items:center"><span style="font-size:12.5px;font-weight:700">過去のメール</span><select class="inp" id="gmrange" style="width:auto">'+[["180","半年前まで"],["365","1年前まで"],["730","2年前まで"],["0","すべて"]].map(function(o){return '<option value="'+o[0]+'"'+((g.range||"365")===o[0]?" selected":"")+'>'+o[1]+'</option>';}).join("")+'</select><button class="btn" type="button" data-act="gmdeep"'+(g.busy?" disabled":"")+'>さかのぼって取り込む</button>'+'</div>'+
+  '<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:12.5px;font-weight:700">過去のメールをさかのぼって取り込む</span><div class="chips">'+[["1m","直近1か月"],["3m","3か月"],["6m","半年"],["1y","1年"],["2y","2年"],["all","すべて"]].map(function(o){return '<button class="chip'+(g.rp===o[0]?" on":"")+'" type="button" data-rp="'+o[0]+'">'+o[1]+'</button>';}).join("")+'</div><div class="frow" style="align-items:flex-end"><label class="fi" style="min-width:0">この日から<input type="date" id="gmfrom" value="'+esc(g.from||"")+'"></label><label class="fi" style="min-width:0">この日まで<input type="date" id="gmto" value="'+esc(g.to||"")+'"></label><button class="btn" type="button" data-act="gmdeep"'+(g.busy?" disabled":"")+'>この期間を取り込む</button></div><div class="es" id="gmrdesc" style="padding:0">'+rdesc()+'</div></div>'+
   '<p class="es" style="padding:0">指定した期間の依頼メールと返信を、古いものから順にまとめて取り込みます。メールが多いと時間がかかるので、取り込みが終わるまでこのページを開いたままにしてください(取り込み済みのメールは飛ばすので、中断しても続きから再開できます)。</p>'+
   '<div><button class="btn" type="button" data-act="getattall">登録済みの案件に、メールの添付をまとめて取り込む</button></div>'+
   '<p class="es" style="padding:0">ページを閉じている間は確認しません。メールの添付ファイル(ZIPは展開して)は、取り込んだ案件の「添付ファイル」に自動で保存します。メールが大きくても取り込みを試み、ZIPは中のファイルごとに保存します。1ファイルが20MBを超えるものは、画像は縮小、動画は低画質のWebMに変換、その他はZIP圧縮してから保存します(動画は再生時間と同じだけ時間がかかります)。それでも収まらないものは案件のメモに残します。(パスワード付きのZIP・PDFは、そのまま保存します。)</p></div>'+
@@ -886,9 +888,10 @@ function csv(){
 
 /* ---- イベント ---- */
 document.addEventListener("click",function(e){
- var t=e.target.closest("[data-nav],[data-go],[data-st],[data-open],[data-edit],[data-sst],[data-ddoc],[data-dl],[data-act],[data-close],[data-setst],[data-rmfile],[data-mgr]");if(!t)return;
+ var t=e.target.closest("[data-nav],[data-go],[data-st],[data-open],[data-edit],[data-sst],[data-ddoc],[data-dl],[data-rp],[data-act],[data-close],[data-setst],[data-rmfile],[data-mgr]");if(!t)return;
  if(t.hasAttribute("data-close")){closeModal();return;}
  if(t.dataset.ddoc){var did=t.dataset.cid,dk=t.dataset.ddoc,dv=t.checked;patchCase(did,function(o){o.docs=o.docs||{};o.docs[dk]=dv;});return;}
+ if(t.dataset.rp){setRange(t.dataset.rp);if(state.view==="mail")render();return;}
  if(t.dataset.dl!==undefined){dlFile(t.dataset.cid,+t.dataset.dl,t);return;}
  if(t.dataset.sst){var sid=t.dataset.cid,sv2=t.dataset.sst;patchCase(sid,function(o){o.status=sv2;},"進み具合を「"+sv2+"」にしました");return;}
  if(t.dataset.edit){if(!state.canWrite){toast("閲覧のみの権限です");return;}openForm(t.dataset.edit);return;}
@@ -900,7 +903,7 @@ document.addEventListener("click",function(e){
  if(t.dataset.setst){collect();editing.status=t.dataset.setst;var sc=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc;return;}
  if(t.dataset.rmfile!==undefined){collect();editing.files.splice(+t.dataset.rmfile,1);var sc2=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc2;return;}
  var a=t.dataset.act;
- if(a==="gmdeep")gmRun(true,{days:+(state.gm.range||"365")});
+ if(a==="gmdeep"){var gg=state.gm;if(!gg.from&&!gg.to&&gg.rp!=="all"){toast("期間を選ぶか、日付を入れてください");return;}gmRun(true,{from:gg.from||"",to:gg.to||""});}
  else if(a==="gmstop"){state.gm.stop=true;}
  else if(a==="ack")patchCase(t.dataset.cid,function(o){o.unread=0;});
  else if(a==="getatt")gmAttachTo(t.dataset.cid,t);
@@ -921,7 +924,7 @@ document.addEventListener("click",function(e){
 document.addEventListener("change",function(e){
  var t=e.target;
  if(t.id==="gmq"){var q=t.value.trim()||GMQ0;state.gm.q=q;state.gm.qEdited=true;if(state.db)state.db.doc("meta/mail").set({query:q,lastRunAt:(state.gm.meta&&state.gm.meta.lastRunAt)||"",lastAdded:(state.gm.meta&&state.gm.meta.lastAdded)||0}).then(function(){toast("検索条件を保存しました");}).catch(function(){toast("保存できませんでした");});return;}
- if(t.id==="gmrange"){state.gm.range=t.value;return;}
+ if(t.id==="gmfrom"||t.id==="gmto"){state.gm[t.id==="gmfrom"?"from":"to"]=t.value;state.gm.rp="";var rr=$("#gmrdesc");if(rr)rr.textContent=rdesc();document.querySelectorAll("[data-rp]").forEach(function(c){c.classList.remove("on");});return;}
  if(t.id==="gmauto"){state.gm.auto=t.checked;try{localStorage.setItem("ls_gmauto",t.checked?"1":"0");}catch(e){}drawMail();return;}
  if(t.dataset&&t.dataset.doc){collect();editing.docs=editing.docs||{};editing.docs[t.dataset.doc]=t.checked;t.closest(".di").classList.toggle("got",t.checked);return;}
  if(t.id==="f_purpose"&&editing){collect();var sc=$(".mb").scrollTop;drawForm();$(".mb").scrollTop=sc;return;}

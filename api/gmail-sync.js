@@ -54,6 +54,12 @@ async function saveFile(name, buf, type) {
   return { id: pathname, url: '/api/file?p=' + encodeURIComponent(pathname), name: clean };
 }
 
+// zip内のファイル名がShift_JIS(日本のWindows標準)で保存されている場合に文字化けを直す
+function fixName(k) {
+  if (!/[\u0080-\u00ff]/.test(k) || /[^\u0000-\u00ff]/.test(k)) return k;
+  try { const t = new TextDecoder('shift_jis').decode(Buffer.from(k, 'latin1')); return t.includes('\ufffd') ? k : t; } catch (e) { return k; }
+}
+
 // 添付を保存(zipは中身を取り出す。4.4MBを超えるものは保存せず名前だけ返す)
 async function attachments(tk, mid, files) {
   const saved = [], skipped = [];
@@ -66,7 +72,7 @@ async function attachments(tk, mid, files) {
         const z = unzipSync(new Uint8Array(buf));
         for (const k of Object.keys(z)) {
           if (k.endsWith('/') || /(^|\/)(__MACOSX|\.DS_Store|Thumbs\.db)/.test(k)) continue;
-          const nm = k.split('/').pop();
+          const nm = fixName(k).split('/').pop();
           if (z[k].length > MAXFILE) { skipped.push(nm); continue; }
           saved.push(await saveFile(nm, Buffer.from(z[k]), ''));
         }
@@ -92,6 +98,29 @@ module.exports = async function handler(req, res) {
   const sum = { registered: 0, linked: 0, skipped: 0, errors: 0, left: 0 };
   try {
     const tk = await token();
+    if (req.query && req.query.attach) {
+      const cur = (await L.readColl('cases')).docs;
+      const want = String(req.query.attach);
+      const ids = want === 'all' ? Object.keys(cur).filter((k) => cur[k].source === 'gmail' && cur[k].mailId && !(cur[k].files || []).length) : [want];
+      let done = 0, saved = 0, big = 0;
+      for (const id of ids.slice(0, 2)) {
+        const c = cur[id]; if (!c || !c.mailId) continue;
+        const m = await gj(tk, 'messages/' + c.mailId + '?format=full');
+        const att = await attachments(tk, c.mailId, walk(m.payload, { text: '', html: '', files: [] }).files);
+        await L.mutate('cases', (docs) => {
+          const x = docs[id]; if (!x) return;
+          const have = new Set((x.files || []).map((f) => f.name));
+          x.files = (x.files || []).concat(att.saved.filter((f) => !have.has(f.name)));
+          x.docs = x.docs || {}; att.saved.forEach((f) => { const k = P.guessDoc(f.name); if (k) x.docs[k] = true; });
+          x.memo = String(x.memo || '').replace(/メール添付:[^\n]*\n?/g, '').replace(/4\.4MBを超えて保存できなかった添付:[^\n]*\n?/g, '').trim();
+          if (att.skipped.length) x.memo += (x.memo ? '\n' : '') + '4.4MBを超えて保存できなかった添付: ' + att.skipped.join('、');
+          x.updatedAt = new Date().toISOString(); x.updatedBy = 'メール自動取り込み';
+        });
+        done++; saved += att.saved.length; big += att.skipped.length;
+      }
+      res.status(200).json({ ok: true, cases: done, saved, skipped: big, left: Math.max(0, ids.length - 2) });
+      return;
+    }
     const days = Math.min(Math.max(+(req.query && req.query.days) || 3, 1), 400);
     const label = String(process.env.GMAIL_LABEL || '100_業者別-リーガルスムーズ');
     let ids = [], pt = '';

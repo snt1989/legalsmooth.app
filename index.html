@@ -237,20 +237,49 @@ function shPull(){
   var d=j.docs||{},rows=Object.keys(d).map(function(id){var o=Object.assign({},d[id]);o.id=id;return o;});
   var sig=JSON.stringify(rows);
   if(sig!==shSig){shSig=sig;state.cases=rows.length?rows:(state.demo?demoRows():[]);if(rows.length)state.demo=false;if(!editing)render();else renderNavOnly();}
-  setSync("ok","チームで共有中・"+rows.length+"件");
+  setSync("ok","チームで共有中・"+rows.length+"件");if(state.view==="mail"&&!shMail.busy)shLoadMail();
  }).catch(function(e){if(e&&e.auth){try{localStorage.removeItem(AK);sessionStorage.removeItem(AK);}catch(x){}location.reload();return;}setSync("warn","接続できません。自動で再接続します");});
 }
 function shUpload(f){
  if(f.size>4.4*1024*1024)return Promise.reject(new Error("big"));
  return fetch("/api/upload?n="+encodeURIComponent(f.name||"file"),{method:"POST",headers:Object.assign({"content-type":f.type||"application/octet-stream"},apiH()),body:f}).then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.json();});
 }
+/* ---- 共有版(Vercel)のメール取り込み画面 ---- */
+var shMail={meta:null,mails:{},busy:false,msg:""};
+function shLoadMail(){return Promise.all([apiGet("meta"),apiGet("mails")]).then(function(r){shMail.meta=(r[0].docs||{}).sync||null;shMail.mails=r[1].docs||{};if(state.view==="mail"&&!editing)render();}).catch(function(){});}
+function shTm(iso){if(!iso)return "";var d=new Date(iso);return (d.getMonth()+1)+"/"+d.getDate()+" "+pad(d.getHours())+":"+pad(d.getMinutes());}
+function viewMailShared(){
+ if(!shMail.loaded){shMail.loaded=true;shLoadMail();}
+ var m=shMail.meta,ST={registered:["o","登録"],linked:["o","返信を紐づけ"],skip:["","対象外"],error:["w","失敗"]};
+ var rows=Object.keys(shMail.mails).map(function(k){var o=shMail.mails[k];return Object.assign({id:k},o);}).sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).slice(0,40);
+ var st=m?(m.ok?"最後の確認 "+shTm(m.at)+"・登録 "+m.registered+"件・返信の紐づけ "+m.linked+"件・対象外 "+m.skipped+"件"+(m.errors?"・失敗 "+m.errors+"件":"")+(m.left?"・残り "+m.left+"通(次回の確認で続きを処理)":""):'<span class="late">'+esc(m.error||"確認できませんでした")+'</span>'):"まだ確認していません。";
+ var h='<div class="card panel"><div class="ph"><h2>メールから案件を自動登録</h2></div>'+
+  '<p style="margin:0;line-height:1.8;color:var(--ink2)">Gmailの「100_業者別/リーガルスムーズ」ラベルのメールを、このページを開いている間は3分ごと、閉じている間は毎日1回、サーバーが自動で確認します。依頼メール(「孤独死…」「無断退去…」)は案件に登録し、返信は同じ案件に紐づけます。登録した案件には「要確認」が付くので、内容を確かめてから保存してください。</p>'+
+  '<div class="note info" style="margin-top:10px">'+st+(shMail.msg?'<br><b>'+esc(shMail.msg)+'</b>':'')+'</div>'+
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" type="button" data-act="shsync"'+(shMail.busy?" disabled":"")+'>今すぐ確認</button>'+
+  '<span style="align-self:center;color:var(--ink3);font-size:12.5px">過去のメールを取り込む:</span>'+
+  [[30,"30日"],[90,"90日"],[180,"半年"],[365,"1年"]].map(function(x){return '<button class="btn sm" type="button" data-act="shpast" data-days="'+x[0]+'"'+(shMail.busy?" disabled":"")+'>'+x[1]+'</button>';}).join("")+'</div></div>';
+ h+='<div class="card panel" style="margin-top:14px"><div class="ph"><h2>最近のメールの処理結果</h2></div>'+(rows.length?'<div class="imp">'+rows.map(function(o){var s=ST[o.state]||["",esc(o.state||"")];return '<div><span class="tag '+s[0]+'">'+s[1]+'</span> <span style="color:var(--ink3)">'+esc(shTm(o.date))+'</span> '+esc((o.subject||"").slice(0,60))+(o.reason?' <span style="color:var(--ink3)">('+esc(o.reason)+')</span>':'')+'</div>';}).join("")+'</div>':'<div class="es">まだ処理したメールはありません。</div>')+'</div>';
+ return h;
+}
+function shSyncRun(days,loop){
+ if(shMail.busy)return;shMail.busy=true;shMail.msg="確認中…";render();
+ var tot={registered:0,linked:0,skipped:0,errors:0},n=0;
+ (function step(){
+  fetch("/api/gmail-sync?days="+days,{headers:apiH(),cache:"no-store"}).then(function(r){return r.json();}).then(function(j){
+   if(!j.ok){shMail.busy=false;shMail.msg="失敗: "+(j.error||"");return shLoadMail().then(render);}
+   ["registered","linked","skipped","errors"].forEach(function(k){tot[k]+=j[k]||0;});n++;
+   if(loop&&j.left>0&&n<40){shMail.msg="確認中… 登録"+tot.registered+"件・紐づけ"+tot.linked+"件(残り約"+j.left+"通)";render();return step();}
+   shMail.busy=false;shMail.msg="完了: 登録 "+tot.registered+"件・返信の紐づけ "+tot.linked+"件・対象外 "+tot.skipped+"件"+(tot.errors?"・失敗 "+tot.errors+"件":"")+(j.left?"。まだ残りがあります。もう一度押すと続きを処理します":"");
+   shSig="";shPull();return shLoadMail().then(render);
+  }).catch(function(){shMail.busy=false;shMail.msg="通信に失敗しました。もう一度お試しください";render();});
+ })();
+}
 function startShared(){
  return apiGet("").then(function(){
   state.mode="shared";state.canWrite=true;state.assets={upload:shUpload};
   setSync("warn","共有データを読み込み中…");shPull();
   clearInterval(shTimer);shTimer=setInterval(shPull,5000);
-  var gsync=function(){if(document.hidden)return;fetch("/api/gmail-sync",{headers:apiH(),cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok&&(j.registered||j.linked))shPull();}).catch(function(){});};
-  setTimeout(gsync,4000);setInterval(gsync,180000);
   document.addEventListener("visibilitychange",function(){if(!document.hidden)shPull();});
   return true;
  });
@@ -793,6 +822,7 @@ function mailLog(){
   return '<tr style="cursor:default"><td class="cm" data-l="件名"><div class="nm">'+esc(m.subject||"(件名なし)")+'</div><div class="ad">'+esc(m.from||"")+'</div></td><td data-l="受信日" class="num">'+fs(jstDate(m.date))+'</td><td data-l="結果">'+res+'</td><td data-l="操作">'+act+'</td></tr>';}).join("")+'</tbody></table></div>';
 }
 function viewMail(){
+ if(state.mode==="shared")return viewMailShared();
  var g=state.gm;
  return '<div class="card panel"><div class="ph"><h2>メールから案件を自動登録</h2></div>'+
   '<p style="margin:0;line-height:1.8;color:var(--ink2)">Gmailの「100_業者別/リーガルスムーズ」ラベルが付いたメールから、依頼メール(「孤独死…」「無断退去…」など)を読み取り、物件・管理会社・鍵・サービス内容などを案件に登録します。登録した案件には「要確認」が付くので、開いて内容を確かめて保存してください。請求書の案内や「RE:」などの返信は、同じやり取りの案件に自動で紐づけて、案件詳細の「メールのやり取り」に要約を残します(作業日や期限が書かれていれば日程も更新、添付も保存します)。</p>'+
@@ -1016,6 +1046,7 @@ document.addEventListener("click",function(e){
  else if(a==="getattall")gmAttachAll(t);
  else if(a==="back"){e.preventDefault();state.detail=null;render();window.scrollTo(0,0);}
  else if(a==="gmrun")gmRun(true);
+ else if(a==="shsync")shSyncRun(3,false);else if(a==="shpast")shSyncRun(+t.dataset.days||30,true);
  else if(a==="gmredo")gmRedo(t.dataset.mid,false);
  else if(a==="gmforce")gmRedo(t.dataset.mid,true);
  else if(a==="new")openForm();
